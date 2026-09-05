@@ -8,6 +8,6 @@ crons = ["15 2 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "gb-bess-pipelines"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "7d4aaadf-bd4f-4187-b714-7baf2314eb4b"
 
 # Optional: create SYNC_TOKEN with `wrangler secret put SYNC_TOKEN --config sync-worker/wrangler.toml`

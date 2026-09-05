@@ -5,5 +5,5 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "gb-bess-pipelines"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "7d4aaadf-bd4f-4187-b714-7baf2314eb4b"
 preview_database_id = "DB"
