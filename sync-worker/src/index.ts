@@ -53,7 +53,7 @@ function normalize(source: SourceName, feature: ArcFeature, syncedAt: string) {
     ? (asNumber(a.Cumulative_Total_Capacity__MW_) ?? asNumber(a.MW_Connected) ?? 0)
     : (accepted ?? connected ?? 0);
   return {
-    id: `${source}:${projectId ?? fid}`,
+    id: `${source}:${fid}`,
     source,
     sourceFid: fid,
     projectId,
