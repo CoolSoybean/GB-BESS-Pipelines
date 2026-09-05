@@ -19,6 +19,8 @@ export interface Project {
   synced_at: string;
 }
 
+export type MapProject = Pick<Project, 'id' | 'source' | 'project_name' | 'status' | 'capacity_mw' | 'latitude' | 'longitude'>;
+
 export interface Summary {
   headline: { projects: number; capacity: number; connected: number; transmission: number; distribution: number };
   statuses: Array<{ name: string; projects: number; capacity: number }>;

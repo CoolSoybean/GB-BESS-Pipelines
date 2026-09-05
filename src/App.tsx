@@ -2,8 +2,8 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, Zap } from 'lucide-react';
-import { loadData, type Filters } from './api';
-import type { Project, Summary } from './types';
+import { loadMapProjects, loadProjects, loadSummary, PROJECTS_PER_PAGE, type Filters, type Pagination } from './api';
+import type { MapProject, Project, Summary } from './types';
 
 const colors = { transmission:'#0f9f98', distribution:'#f59e0b', navy:'#0c2d48', muted:'#64748b' };
 const initialFilters: Filters = { source:'all', q:'', status:'', operator:'', year:'' };
@@ -46,7 +46,7 @@ function MapResizeOnSidebarChange() {
   return null;
 }
 
-const ProjectMap=memo(function ProjectMap({ projects }: { projects:Project[] }) {
+const ProjectMap=memo(function ProjectMap({ projects }: { projects:MapProject[] }) {
   const points=projects.filter(p=>p.latitude!=null&&p.longitude!=null);
   return <MapContainer center={[54.5,-3]} zoom={5} minZoom={4} scrollWheelZoom className="map">
     <MapResizeOnSidebarChange/>
@@ -57,11 +57,14 @@ const ProjectMap=memo(function ProjectMap({ projects }: { projects:Project[] }) 
   </MapContainer>;
 });
 
-function Dashboard({ projects, summary, demo, filters, setFilters, reload, loading }: { projects:Project[]; summary:Summary; demo:boolean; filters:Filters; setFilters:(f:Filters)=>void; reload:()=>void; loading:boolean }) {
-  const statuses=useMemo(()=>[...new Set(projects.map(p=>p.status).filter(Boolean))].sort() as string[],[projects]);
-  const years=useMemo(()=>[...new Set(projects.map(p=>p.target_year).filter(Boolean))].sort() as number[],[projects]);
+function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, demo, filters, setFilters, reload, loading }: { projects:Project[]; mapProjects:MapProject[]; pagination:Pagination; page:number; setPage:(page:number)=>void; summary:Summary; demo:boolean; filters:Filters; setFilters:(f:Filters)=>void; reload:()=>void; loading:boolean }) {
+  const statuses=useMemo(()=>summary.statuses.map(item=>item.name).sort(),[summary.statuses]);
+  const years=useMemo(()=>summary.timeline.map(item=>item.year).sort((a,b)=>a-b),[summary.timeline]);
   const updated=summary.sync.map(s=>s.last_success_at).filter(Boolean).sort().at(-1);
   const development=Math.max(0,Number(summary.headline.capacity)-Number(summary.headline.connected));
+  const totalPages=Math.max(1,Math.ceil(pagination.total/pagination.pageSize));
+  const rangeStart=pagination.total?(page-1)*pagination.pageSize+1:0;
+  const rangeEnd=Math.min(page*pagination.pageSize,pagination.total);
   return <div className="shell">
     <Sidebar/>
 
@@ -85,7 +88,7 @@ function Dashboard({ projects, summary, demo, filters, setFilters, reload, loadi
       </section>
 
       <section className="visual-grid">
-        <article id="map" className="panel map-panel"><div className="panel-heading"><div><span className="kicker">GEOGRAPHY</span><h2>Project map</h2></div><div className="legend"><span><i className="transmission"/>Transmission</span><span><i className="distribution"/>Distribution</span></div></div><ProjectMap projects={projects}/></article>
+        <article id="map" className="panel map-panel"><div className="panel-heading"><div><span className="kicker">GEOGRAPHY</span><h2>Project map</h2></div><div className="legend"><span><i className="transmission"/>Transmission</span><span><i className="distribution"/>Distribution</span></div></div><ProjectMap projects={mapProjects}/></article>
         <article className="panel"><div className="panel-heading"><div><span className="kicker">PIPELINE</span><h2>Capacity by status</h2></div><span className="unit">MW</span></div><div className="chart tall"><ResponsiveContainer initialDimension={{width:600,height:330}}><BarChart data={summary.statuses.slice(0,7)} layout="vertical" margin={{left:18,right:35}}><CartesianGrid horizontal={false} strokeDasharray="3 3"/><XAxis type="number" tickLine={false} axisLine={false}/><YAxis dataKey="name" type="category" width={105} tickLine={false} axisLine={false} tick={{fontSize:11}}/><Tooltip formatter={(v)=>formatCapacity(Number(v))}/><Bar dataKey="capacity" radius={[0,6,6,0]}>{summary.statuses.slice(0,7).map((_,i)=><Cell key={i} fill={i%2?colors.navy:colors.transmission}/>)}</Bar></BarChart></ResponsiveContainer></div></article>
       </section>
 
@@ -95,9 +98,10 @@ function Dashboard({ projects, summary, demo, filters, setFilters, reload, loadi
       </section>
 
       <section id="projects" className="panel projects-panel">
-        <div className="panel-heading"><div><span className="kicker">REGISTER</span><h2>Storage projects</h2></div><span className="result-count">{projects.length.toLocaleString()} shown</span></div>
+        <div className="panel-heading"><div><span className="kicker">REGISTER</span><h2>Storage projects</h2></div><span className="result-count">{rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {pagination.total.toLocaleString()}</span></div>
         <div className="filters"><label className="search"><Search/><input value={filters.q} onChange={e=>setFilters({...filters,q:e.target.value})} placeholder="Search projects, sites or customers"/></label><select aria-label="Status" value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}><option value="">All statuses</option>{statuses.map(x=><option key={x}>{x}</option>)}</select><select aria-label="Operator" value={filters.operator} onChange={e=>setFilters({...filters,operator:e.target.value})}><option value="">All operators</option>{summary.operators.map(x=><option key={x.value}>{x.value}</option>)}</select><select aria-label="Target year" value={filters.year} onChange={e=>setFilters({...filters,year:e.target.value})}><option value="">All target years</option>{years.map(x=><option key={x}>{x}</option>)}</select><button className="clear" onClick={()=>setFilters(initialFilters)}><FilterX/>Clear</button></div>
         <div className="table-wrap"><table><thead><tr><th>Project</th><th>Customer</th><th>Site</th><th>Technology</th><th>Connection</th><th>Status</th><th>Capacity</th><th>Target</th><th>Operator</th></tr></thead><tbody>{projects.map(p=><tr key={p.id}><td><strong>{p.project_name}</strong></td><td>{p.customer_name ?? '—'}</td><td>{p.site_name ?? '—'}</td><td>{p.technology ?? '—'}</td><td><span className={`connection ${p.source}`}><i/>{p.source}</span></td><td><StatusPill value={p.status}/></td><td><strong>{formatCapacity(p.capacity_mw)}</strong></td><td>{p.target_year ?? '—'}</td><td>{p.operator_name ?? '—'}</td></tr>)}{!projects.length&&<tr><td colSpan={9} className="empty">No projects match these filters.</td></tr>}</tbody></table></div>
+        <div className="pagination"><button onClick={()=>setPage(Math.max(1,page-1))} disabled={page<=1||loading}>Previous</button><span>Page {page.toLocaleString()} of {totalPages.toLocaleString()}</span><button onClick={()=>setPage(Math.min(totalPages,page+1))} disabled={page>=totalPages||loading}>Next</button></div>
       </section>
       <footer>Data source: Regen / Electricity Storage Network ArcGIS dashboard. Verify licensing and attribution before public redistribution.</footer>
     </main>
@@ -105,8 +109,11 @@ function Dashboard({ projects, summary, demo, filters, setFilters, reload, loadi
 }
 
 export default function App() {
-  const [filters,setFilters]=useState<Filters>(initialFilters); const [projects,setProjects]=useState<Project[]>([]); const [summary,setSummary]=useState<Summary|null>(null); const [demo,setDemo]=useState(false); const [loading,setLoading]=useState(true); const [revision,setRevision]=useState(0);
-  useEffect(()=>{let active=true; const timer=setTimeout(()=>loadData(filters).then(data=>{if(active){setProjects(data.projects);setSummary(data.summary);setDemo(data.demo)}}).finally(()=>active&&setLoading(false)),filters.q?250:0); return()=>{active=false;clearTimeout(timer)}},[filters,revision]);
+  const [filters,setFilterState]=useState<Filters>(initialFilters); const [projects,setProjects]=useState<Project[]>([]); const [mapProjects,setMapProjects]=useState<MapProject[]>([]); const [pagination,setPagination]=useState<Pagination>({page:1,pageSize:PROJECTS_PER_PAGE,total:0}); const [page,setPage]=useState(1); const [summary,setSummary]=useState<Summary|null>(null); const [demo,setDemo]=useState(false); const [loading,setLoading]=useState(true); const [revision,setRevision]=useState(0);
+  const setFilters=(next:Filters)=>{setLoading(true);setPage(1);setFilterState(next)};
+  useEffect(()=>{let active=true;loadSummary().then(data=>{if(active){setSummary(data.summary);setDemo(data.demo)}});return()=>{active=false}},[revision]);
+  useEffect(()=>{let active=true;const timer=setTimeout(()=>loadProjects(filters,page).then(data=>{if(active){setProjects(data.projects);setPagination(data.pagination);setDemo(current=>current||data.demo)}}).finally(()=>active&&setLoading(false)),filters.q?250:0);return()=>{active=false;clearTimeout(timer)}},[filters,page,revision]);
+  useEffect(()=>{let active=true;const timer=setTimeout(()=>loadMapProjects(filters).then(data=>active&&setMapProjects(data)),filters.q?250:0);return()=>{active=false;clearTimeout(timer)}},[filters,revision]);
   if(!summary)return <div className="loading"><BatteryCharging/><strong>Loading pipeline intelligence…</strong></div>;
-  return <Dashboard projects={projects} summary={summary} demo={demo} filters={filters} setFilters={setFilters} reload={()=>{setLoading(true);setRevision(x=>x+1)}} loading={loading}/>;
+  return <Dashboard projects={projects} mapProjects={mapProjects} pagination={pagination} page={page} setPage={next=>{setLoading(true);setPage(next)}} summary={summary} demo={demo} filters={filters} setFilters={setFilters} reload={()=>{setLoading(true);setRevision(x=>x+1)}} loading={loading}/>;
 }
