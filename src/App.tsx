@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Activity, BatteryCharging, Database, FilterX, Map, RefreshCw, Search, Server, Zap } from 'lucide-react';
+import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, Zap } from 'lucide-react';
 import { loadData, type Filters } from './api';
 import type { Project, Summary } from './types';
 
@@ -35,15 +35,18 @@ function ProjectMap({ projects }: { projects:Project[] }) {
 }
 
 function Dashboard({ projects, summary, demo, filters, setFilters, reload, loading }: { projects:Project[]; summary:Summary; demo:boolean; filters:Filters; setFilters:(f:Filters)=>void; reload:()=>void; loading:boolean }) {
+  const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('sidebar-collapsed')==='true');
   const statuses=useMemo(()=>[...new Set(projects.map(p=>p.status).filter(Boolean))].sort() as string[],[projects]);
   const years=useMemo(()=>[...new Set(projects.map(p=>p.target_year).filter(Boolean))].sort() as number[],[projects]);
   const updated=summary.sync.map(s=>s.last_success_at).filter(Boolean).sort().at(-1);
   const development=Math.max(0,Number(summary.headline.capacity)-Number(summary.headline.connected));
-  return <div className="shell">
+  const toggleSidebar=()=>setSidebarCollapsed(value=>{const next=!value;localStorage.setItem('sidebar-collapsed',String(next));return next});
+  return <div className={`shell ${sidebarCollapsed?'sidebar-is-collapsed':''}`}>
     <aside className="sidebar">
       <div className="brand"><BatteryCharging/><div><strong>GB BESS</strong><span>Pipelines</span></div></div>
-      <nav aria-label="Primary"><a className="active" href="#overview"><Activity/>Overview</a><a href="#map"><Map/>Project map</a><a href="#projects"><Database/>Projects</a></nav>
-      <div className="source-note"><Server/><div><strong>Source</strong><span>Regen / ESN ArcGIS</span></div></div>
+      <button className="sidebar-toggle" onClick={toggleSidebar} aria-label={sidebarCollapsed?'Expand sidebar':'Collapse sidebar'} title={sidebarCollapsed?'Expand sidebar':'Collapse sidebar'}>{sidebarCollapsed?<ChevronRight/>:<ChevronLeft/>}</button>
+      <nav aria-label="Primary"><a className="active" href="#overview" title="Overview"><Activity/>Overview</a><a href="#map" title="Project map"><Map/>Project map</a><a href="#projects" title="Projects"><Database/>Projects</a></nav>
+      <div className="source-note" title="Source: Regen / ESN ArcGIS"><Server/><div><strong>Source</strong><span>Regen / ESN ArcGIS</span></div></div>
     </aside>
 
     <main>
