@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, TriangleAlert, Zap } from 'lucide-react';
-import { loadMapProjects, loadProjects, loadSummary, PROJECTS_PER_PAGE, type Filters, type Pagination } from './api';
+import { loadMapProjects, loadProjects, loadSummary, recordVisit, PROJECTS_PER_PAGE, type Filters, type Pagination } from './api';
 import type { MapProject, Project, Summary } from './types';
 
 const colors = { transmission:'#0f9f98', distribution:'#f59e0b', navy:'#0c2d48', muted:'#64748b' };
@@ -57,7 +57,7 @@ const ProjectMap=memo(function ProjectMap({ projects }: { projects:MapProject[] 
   </MapContainer>;
 });
 
-function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, demo, filters, setFilters, reload, loading }: { projects:Project[]; mapProjects:MapProject[]; pagination:Pagination; page:number; setPage:(page:number)=>void; summary:Summary; demo:boolean; filters:Filters; setFilters:(f:Filters)=>void; reload:()=>void; loading:boolean }) {
+function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, demo, filters, setFilters, reload, loading, totalVisits }: { projects:Project[]; mapProjects:MapProject[]; pagination:Pagination; page:number; setPage:(page:number)=>void; summary:Summary; demo:boolean; filters:Filters; setFilters:(f:Filters)=>void; reload:()=>void; loading:boolean; totalVisits:number|null }) {
   const statuses=useMemo(()=>summary.statuses.map(item=>item.name).sort(),[summary.statuses]);
   const years=useMemo(()=>summary.timeline.map(item=>item.year).sort((a,b)=>a-b),[summary.timeline]);
   const updated=summary.sync.map(s=>s.last_success_at).filter(Boolean).sort().at(-1);
@@ -103,17 +103,18 @@ function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, 
         <div className="table-wrap"><table><thead><tr><th>Project</th><th>Customer</th><th>Site</th><th>Technology</th><th>Connection</th><th>Status</th><th>Capacity</th><th>Target</th><th>Operator</th></tr></thead><tbody>{projects.map(p=><tr key={p.id}><td><strong>{p.project_name}</strong></td><td>{p.customer_name ?? '—'}</td><td>{p.site_name ?? '—'}</td><td>{p.technology ?? '—'}</td><td><span className={`connection ${p.source}`}><i/>{p.source}</span></td><td><StatusPill value={p.status}/></td><td><strong>{formatCapacity(p.capacity_mw)}</strong></td><td>{p.target_year ?? '—'}</td><td>{p.operator_name ?? '—'}</td></tr>)}{!projects.length&&<tr><td colSpan={9} className="empty">No projects match these filters.</td></tr>}</tbody></table></div>
         <div className="pagination"><button onClick={()=>setPage(Math.max(1,page-1))} disabled={page<=1||loading}>Previous</button><span>Page {page.toLocaleString()} of {totalPages.toLocaleString()}</span><button onClick={()=>setPage(Math.min(totalPages,page+1))} disabled={page>=totalPages||loading}>Next</button></div>
       </section>
-      <footer>Created by the GB124 Team and developed by ChatGPT.</footer>
+      <footer><span>Created by the GB124 Team and developed by ChatGPT.</span><span>Total visits: {totalVisits?.toLocaleString() ?? '—'}</span></footer>
     </main>
   </div>;
 }
 
 export default function App() {
-  const [filters,setFilterState]=useState<Filters>(initialFilters); const [projects,setProjects]=useState<Project[]>([]); const [mapProjects,setMapProjects]=useState<MapProject[]>([]); const [pagination,setPagination]=useState<Pagination>({page:1,pageSize:PROJECTS_PER_PAGE,total:0}); const [page,setPage]=useState(1); const [summary,setSummary]=useState<Summary|null>(null); const [demo,setDemo]=useState(false); const [loading,setLoading]=useState(true); const [revision,setRevision]=useState(0);
+  const [filters,setFilterState]=useState<Filters>(initialFilters); const [projects,setProjects]=useState<Project[]>([]); const [mapProjects,setMapProjects]=useState<MapProject[]>([]); const [pagination,setPagination]=useState<Pagination>({page:1,pageSize:PROJECTS_PER_PAGE,total:0}); const [page,setPage]=useState(1); const [summary,setSummary]=useState<Summary|null>(null); const [demo,setDemo]=useState(false); const [loading,setLoading]=useState(true); const [revision,setRevision]=useState(0); const [totalVisits,setTotalVisits]=useState<number|null>(null);
   const setFilters=(next:Filters)=>{setLoading(true);setPage(1);setFilterState(next)};
   useEffect(()=>{let active=true;loadSummary().then(data=>{if(active){setSummary(data.summary);setDemo(data.demo)}});return()=>{active=false}},[revision]);
-  useEffect(()=>{let active=true;const timer=setTimeout(()=>loadProjects(filters,page).then(data=>{if(active){setProjects(data.projects);setPagination(data.pagination);setDemo(current=>current||data.demo)}}).finally(()=>active&&setLoading(false)),filters.q?250:0);return()=>{active=false;clearTimeout(timer)}},[filters,page,revision]);
-  useEffect(()=>{let active=true;const timer=setTimeout(()=>loadMapProjects(filters).then(data=>active&&setMapProjects(data)),filters.q?250:0);return()=>{active=false;clearTimeout(timer)}},[filters,revision]);
+  useEffect(()=>{let active=true;recordVisit().then(total=>active&&setTotalVisits(total));return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;const timer=setTimeout(()=>loadProjects(filters,page).then(data=>{if(active){setProjects(data.projects);setPagination(data.pagination);setDemo(current=>current||data.demo)}}).finally(()=>active&&setLoading(false)),filters.q?500:0);return()=>{active=false;clearTimeout(timer)}},[filters,page,revision]);
+  useEffect(()=>{let active=true;const timer=setTimeout(()=>loadMapProjects(filters).then(data=>active&&setMapProjects(data)),filters.q?500:0);return()=>{active=false;clearTimeout(timer)}},[filters,revision]);
   if(!summary)return <div className="loading"><BatteryCharging/><strong>Loading pipeline intelligence…</strong></div>;
-  return <Dashboard projects={projects} mapProjects={mapProjects} pagination={pagination} page={page} setPage={next=>{setLoading(true);setPage(next)}} summary={summary} demo={demo} filters={filters} setFilters={setFilters} reload={()=>{setLoading(true);setRevision(x=>x+1)}} loading={loading}/>;
+  return <Dashboard projects={projects} mapProjects={mapProjects} pagination={pagination} page={page} setPage={next=>{setLoading(true);setPage(next)}} summary={summary} demo={demo} filters={filters} setFilters={setFilters} reload={()=>{setLoading(true);setRevision(x=>x+1)}} loading={loading} totalVisits={totalVisits}/>;
 }

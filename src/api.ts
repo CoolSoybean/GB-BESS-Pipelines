@@ -10,7 +10,7 @@ export interface Pagination { page: number; pageSize: number; total: number }
 function filterParams(filters: Filters) {
   const params = new URLSearchParams();
   if (filters.source !== 'all') params.set('source', filters.source);
-  if (filters.q) params.set('q', filters.q);
+  if (filters.q.trim().length >= 2) params.set('q', filters.q.trim());
   if (filters.status) params.set('status', filters.status);
   if (filters.operator) params.set('operator', filters.operator);
   if (filters.year) params.set('year', filters.year);
@@ -56,5 +56,19 @@ export async function loadMapProjects(filters: Filters): Promise<MapProject[]> {
     return (await response.json() as {data:MapProject[]}).data;
   } catch {
     return filterDemo(filters).map(({id,source,project_name,status,capacity_mw,latitude,longitude})=>({id,source,project_name,status,capacity_mw,latitude,longitude}));
+  }
+}
+
+export async function recordVisit(): Promise<number | null> {
+  const stored = sessionStorage.getItem('gb-bess-visit-total');
+  if (stored) return Number(stored);
+  try {
+    const response = await fetch(`${base}/api/visits`, { method: 'POST' });
+    if (!response.ok) throw new Error('Visit counter unavailable');
+    const { total } = await response.json() as { total: number };
+    sessionStorage.setItem('gb-bess-visit-total', String(total));
+    return total;
+  } catch {
+    return null;
   }
 }
