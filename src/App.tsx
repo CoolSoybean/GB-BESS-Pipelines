@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, Zap } from 'lucide-react';
 import { loadData, type Filters } from './api';
@@ -24,30 +24,46 @@ function StatusPill({ value }: { value:string|null }) {
   return <span className={`status ${done?'done':early?'early':'progress'}`}>{label}</span>;
 }
 
-function ProjectMap({ projects }: { projects:Project[] }) {
+function Sidebar() {
+  const [collapsed,setCollapsed]=useState(()=>localStorage.getItem('sidebar-collapsed')==='true');
+  useEffect(()=>{
+    document.documentElement.classList.toggle('sidebar-is-collapsed',collapsed);
+    localStorage.setItem('sidebar-collapsed',String(collapsed));
+    const frame=requestAnimationFrame(()=>window.dispatchEvent(new Event('sidebar-layout-changed')));
+    return()=>cancelAnimationFrame(frame);
+  },[collapsed]);
+  return <aside className="sidebar">
+    <div className="brand"><BatteryCharging/><div><strong>GB BESS</strong><span>Pipelines</span></div></div>
+    <button className="sidebar-toggle" onClick={()=>setCollapsed(value=>!value)} aria-label={collapsed?'Expand sidebar':'Collapse sidebar'} title={collapsed?'Expand sidebar':'Collapse sidebar'}>{collapsed?<ChevronRight/>:<ChevronLeft/>}</button>
+    <nav aria-label="Primary"><a className="active" href="#overview" title="Overview"><Activity/>Overview</a><a href="#map" title="Project map"><Map/>Project map</a><a href="#projects" title="Projects"><Database/>Projects</a></nav>
+    <div className="source-note" title="Source: Regen / ESN ArcGIS"><Server/><div><strong>Source</strong><span>Regen / ESN ArcGIS</span></div></div>
+  </aside>;
+}
+
+function MapResizeOnSidebarChange() {
+  const map=useMap();
+  useEffect(()=>{const resize=()=>map.invalidateSize({animate:false});window.addEventListener('sidebar-layout-changed',resize);return()=>window.removeEventListener('sidebar-layout-changed',resize)},[map]);
+  return null;
+}
+
+const ProjectMap=memo(function ProjectMap({ projects }: { projects:Project[] }) {
   const points=projects.filter(p=>p.latitude!=null&&p.longitude!=null);
   return <MapContainer center={[54.5,-3]} zoom={5} minZoom={4} scrollWheelZoom className="map">
+    <MapResizeOnSidebarChange/>
     <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     {points.map(p=><CircleMarker key={p.id} center={[p.latitude!,p.longitude!]} radius={Math.min(13,5+Math.sqrt(Math.max(p.capacity_mw,0))/4)} pathOptions={{color:'#fff',weight:2,fillColor:colors[p.source],fillOpacity:.9}}>
       <Popup><strong>{p.project_name}</strong><br/>{p.source}<br/>{formatCapacity(p.capacity_mw)}<br/>{p.status}</Popup>
     </CircleMarker>)}
   </MapContainer>;
-}
+});
 
 function Dashboard({ projects, summary, demo, filters, setFilters, reload, loading }: { projects:Project[]; summary:Summary; demo:boolean; filters:Filters; setFilters:(f:Filters)=>void; reload:()=>void; loading:boolean }) {
-  const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('sidebar-collapsed')==='true');
   const statuses=useMemo(()=>[...new Set(projects.map(p=>p.status).filter(Boolean))].sort() as string[],[projects]);
   const years=useMemo(()=>[...new Set(projects.map(p=>p.target_year).filter(Boolean))].sort() as number[],[projects]);
   const updated=summary.sync.map(s=>s.last_success_at).filter(Boolean).sort().at(-1);
   const development=Math.max(0,Number(summary.headline.capacity)-Number(summary.headline.connected));
-  const toggleSidebar=()=>setSidebarCollapsed(value=>{const next=!value;localStorage.setItem('sidebar-collapsed',String(next));return next});
-  return <div className={`shell ${sidebarCollapsed?'sidebar-is-collapsed':''}`}>
-    <aside className="sidebar">
-      <div className="brand"><BatteryCharging/><div><strong>GB BESS</strong><span>Pipelines</span></div></div>
-      <button className="sidebar-toggle" onClick={toggleSidebar} aria-label={sidebarCollapsed?'Expand sidebar':'Collapse sidebar'} title={sidebarCollapsed?'Expand sidebar':'Collapse sidebar'}>{sidebarCollapsed?<ChevronRight/>:<ChevronLeft/>}</button>
-      <nav aria-label="Primary"><a className="active" href="#overview" title="Overview"><Activity/>Overview</a><a href="#map" title="Project map"><Map/>Project map</a><a href="#projects" title="Projects"><Database/>Projects</a></nav>
-      <div className="source-note" title="Source: Regen / ESN ArcGIS"><Server/><div><strong>Source</strong><span>Regen / ESN ArcGIS</span></div></div>
-    </aside>
+  return <div className="shell">
+    <Sidebar/>
 
     <main>
       <header className="topbar">
