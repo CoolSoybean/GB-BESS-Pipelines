@@ -1,0 +1,13 @@
+name = "gb-bess-pipelines-sync"
+main = "src/index.ts"
+compatibility_date = "2026-09-05"
+
+[triggers]
+crons = ["15 2 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gb-bess-pipelines"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Optional: create SYNC_TOKEN with `wrangler secret put SYNC_TOKEN --config sync-worker/wrangler.toml`
