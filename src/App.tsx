@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, Zap } from 'lucide-react';
+import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, TriangleAlert, Zap } from 'lucide-react';
 import { loadMapProjects, loadProjects, loadSummary, PROJECTS_PER_PAGE, type Filters, type Pagination } from './api';
 import type { MapProject, Project, Summary } from './types';
 
@@ -36,7 +36,7 @@ function Sidebar() {
     <div className="brand"><BatteryCharging/><div><strong>GB BESS</strong><span>Pipelines</span></div></div>
     <button className="sidebar-toggle" onClick={()=>setCollapsed(value=>!value)} aria-label={collapsed?'Expand sidebar':'Collapse sidebar'} title={collapsed?'Expand sidebar':'Collapse sidebar'}>{collapsed?<ChevronRight/>:<ChevronLeft/>}</button>
     <nav aria-label="Primary"><a className="active" href="#overview" title="Overview"><Activity/>Overview</a><a href="#map" title="Project map"><Map/>Project map</a><a href="#projects" title="Projects"><Database/>Projects</a></nav>
-    <div className="source-note" title="Source: Regen / ESN ArcGIS"><Server/><div><strong>Source</strong><span>Regen / ESN ArcGIS</span></div></div>
+    <div className="source-note" title="Source: NESO TEC / DNO ECR"><Server/><div><strong>Source</strong><span>NESO TEC / DNO ECR</span></div></div>
   </aside>;
 }
 
@@ -74,7 +74,7 @@ function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, 
         <div className="sync"><button onClick={reload} disabled={loading} aria-label="Refresh data"><RefreshCw className={loading?'spin':''}/></button><div><span>Last synced</span><strong>{updated?new Date(updated).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):'Not yet synced'}</strong></div></div>
       </header>
 
-      {demo&&<div className="demo-banner"><strong>Demo mode</strong> — connect and migrate D1 to replace these sample records with live ArcGIS data.</div>}
+      {demo&&<div className="demo-banner"><strong>Demo mode</strong><span>—</span><TriangleAlert aria-label="Alert"/>daily operation limit exceeded</div>}
 
       <section className="tabs" aria-label="Connection type">
         {(['all','transmission','distribution'] as const).map(source=><button key={source} className={filters.source===source?'active':''} onClick={()=>setFilters({...filters,source})}>{source==='all'?'All projects':source[0].toUpperCase()+source.slice(1)}</button>)}
@@ -103,7 +103,7 @@ function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, 
         <div className="table-wrap"><table><thead><tr><th>Project</th><th>Customer</th><th>Site</th><th>Technology</th><th>Connection</th><th>Status</th><th>Capacity</th><th>Target</th><th>Operator</th></tr></thead><tbody>{projects.map(p=><tr key={p.id}><td><strong>{p.project_name}</strong></td><td>{p.customer_name ?? '—'}</td><td>{p.site_name ?? '—'}</td><td>{p.technology ?? '—'}</td><td><span className={`connection ${p.source}`}><i/>{p.source}</span></td><td><StatusPill value={p.status}/></td><td><strong>{formatCapacity(p.capacity_mw)}</strong></td><td>{p.target_year ?? '—'}</td><td>{p.operator_name ?? '—'}</td></tr>)}{!projects.length&&<tr><td colSpan={9} className="empty">No projects match these filters.</td></tr>}</tbody></table></div>
         <div className="pagination"><button onClick={()=>setPage(Math.max(1,page-1))} disabled={page<=1||loading}>Previous</button><span>Page {page.toLocaleString()} of {totalPages.toLocaleString()}</span><button onClick={()=>setPage(Math.min(totalPages,page+1))} disabled={page>=totalPages||loading}>Next</button></div>
       </section>
-      <footer>Data source: Regen / Electricity Storage Network ArcGIS dashboard. Verify licensing and attribution before public redistribution.</footer>
+      <footer>Created by the GB124 Team and developed by ChatGPT.</footer>
     </main>
   </div>;
 }

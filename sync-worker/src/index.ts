@@ -18,6 +18,7 @@ const COLUMNS = `id, source, source_fid, source_project_id, project_name, custom
   site_name, operator_name, technology, status, capacity_mw, connected_capacity_mw,
   accepted_capacity_mw, connection_date, target_year, latitude, longitude,
   upstream_updated_at, synced_at, raw_json`;
+const MAP_CACHE_CHUNK_SIZE = 500;
 
 function asNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
@@ -156,9 +157,52 @@ async function syncSource(env: Env, source: SourceName, force = false) {
   }
 }
 
+async function refreshDashboardCache(db: D1Database) {
+  const [headline, statuses, technologies, timeline, operators, sync, mapRows] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) projects, COALESCE(SUM(capacity_mw),0) capacity,
+      COALESCE(SUM(CASE WHEN lower(status) LIKE '%built%' OR lower(status) LIKE '%connected%' THEN capacity_mw ELSE 0 END),0) connected,
+      COALESCE(SUM(CASE WHEN source='transmission' THEN capacity_mw ELSE 0 END),0) transmission,
+      COALESCE(SUM(CASE WHEN source='distribution' THEN capacity_mw ELSE 0 END),0) distribution
+      FROM storage_sites`).first(),
+    db.prepare(`SELECT COALESCE(status,'Unknown') name, COUNT(*) projects, ROUND(SUM(capacity_mw),2) capacity FROM storage_sites GROUP BY status ORDER BY capacity DESC LIMIT 10`).all(),
+    db.prepare(`SELECT COALESCE(technology,'Unknown') name, COUNT(*) projects, ROUND(SUM(capacity_mw),2) capacity FROM storage_sites GROUP BY technology ORDER BY capacity DESC LIMIT 8`).all(),
+    db.prepare(`SELECT target_year year, COUNT(*) projects, ROUND(SUM(capacity_mw),2) capacity FROM storage_sites WHERE target_year BETWEEN 2020 AND 2045 GROUP BY target_year ORDER BY target_year`).all(),
+    db.prepare(`SELECT DISTINCT operator_name value FROM storage_sites WHERE operator_name IS NOT NULL ORDER BY operator_name`).all(),
+    db.prepare(`SELECT source, last_success_at, record_count, status, error_message FROM sync_state ORDER BY source`).all(),
+    db.prepare(`SELECT id, source, project_name, customer_name, site_name, operator_name,
+      status, capacity_mw, target_year, latitude, longitude
+      FROM storage_sites WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+      ORDER BY capacity_mw DESC LIMIT 10000`).all(),
+  ]);
+
+  const generatedAt = new Date().toISOString();
+  const summary = JSON.stringify({
+    headline,
+    statuses: statuses.results,
+    technologies: technologies.results,
+    timeline: timeline.results,
+    operators: operators.results,
+    sync: sync.results,
+  });
+  const mapChunks: unknown[][] = [];
+  for (let start = 0; start < mapRows.results.length; start += MAP_CACHE_CHUNK_SIZE) {
+    mapChunks.push(mapRows.results.slice(start, start + MAP_CACHE_CHUNK_SIZE));
+  }
+
+  await db.batch([
+    db.prepare(`INSERT INTO dashboard_cache(cache_key,chunk_index,payload,generated_at)
+      VALUES('summary',0,?,?) ON CONFLICT(cache_key,chunk_index) DO UPDATE SET
+      payload=excluded.payload,generated_at=excluded.generated_at`).bind(summary, generatedAt),
+    db.prepare(`DELETE FROM dashboard_cache WHERE cache_key='map'`),
+    ...mapChunks.map((chunk, index) => db.prepare(`INSERT INTO dashboard_cache(cache_key,chunk_index,payload,generated_at)
+      VALUES('map',?,?,?)`).bind(index, JSON.stringify(chunk), generatedAt)),
+  ]);
+}
+
 async function run(env: Env, force = false) {
   const results = [];
   for (const source of Object.keys(SOURCES) as SourceName[]) results.push(await syncSource(env, source, force));
+  await refreshDashboardCache(env.DB);
   return results;
 }
 
