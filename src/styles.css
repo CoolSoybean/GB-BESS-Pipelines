@@ -13,3 +13,20 @@
 
 .pagination{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:12px 16px;border-top:1px solid #e5edf1;color:var(--muted);font-size:11px}.pagination button{border:1px solid #d5e1e7;background:#fff;color:#334e68;border-radius:8px;padding:7px 12px}.pagination button:hover:not(:disabled){border-color:var(--teal);color:#08756f}.pagination button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:720px){.pagination{justify-content:center}}
 @media(max-width:430px){.stats-grid{grid-template-columns:1fr}.topbar h1{font-size:24px}.tabs{gap:14px}.tabs button{font-size:12px}.filters{grid-template-columns:1fr}.search,.clear{grid-column:auto}.tech-wrap{grid-template-columns:1fr;height:auto}.donut{height:190px}.tech-list{padding:0 14px 14px}}
+
+/* Keep the Ko-fi overlay clear of navigation and leave room below the footer.
+   Body specificity overrides the stylesheet loaded later by the widget. */
+.shell main{padding-bottom:112px}
+body .floatingchat-container-wrap,
+body .floatingchat-container-wrap-mobi{left:auto;right:24px;bottom:24px;width:195px;max-width:195px}
+body .floatingchat-container-wrap{display:block}
+body .floatingchat-container-wrap-mobi{display:none}
+body .floating-chat-kofi-popup-iframe,
+body .floating-chat-kofi-popup-iframe-mobi{left:auto;right:24px;bottom:89px;max-width:calc(100vw - 48px)}
+@media(max-width:720px){
+  .shell main{padding-bottom:96px}
+  body .floatingchat-container-wrap{display:none}
+  body .floatingchat-container-wrap-mobi{display:block;right:16px;bottom:calc(16px + env(safe-area-inset-bottom, 0px));height:50px}
+  body .floating-chat-kofi-popup-iframe,
+  body .floating-chat-kofi-popup-iframe-mobi{right:16px;bottom:calc(81px + env(safe-area-inset-bottom, 0px));max-width:calc(100vw - 32px)}
+}
