@@ -19,6 +19,16 @@ function StatCard({ label, value, detail, icon:Icon, tone='teal' }: { label:stri
   </article>;
 }
 
+function StatusAxisTick({ x=0, y=0, payload }: { x?:number; y?:number; payload?:{value:string} }) {
+  const label=payload?.value ?? '';
+  const lines=label==='UnderConstruction/Commissioning'
+    ? ['Under construction','/ Commissioning']
+    : [label];
+  return <text x={x} y={y} textAnchor="end" fill="#666" fontSize={11}>
+    {lines.map((line,index)=><tspan key={index} x={x} dy={index===0?(lines.length===2?-3:4):14}>{line}</tspan>)}
+  </text>;
+}
+
 function StatusPill({ value }: { value:string|null }) {
   const label=value ?? 'Unknown'; const done=/built|connected/i.test(label); const early=/scope|planning/i.test(label);
   return <span className={`status ${done?'done':early?'early':'progress'}`}>{label}</span>;
@@ -89,7 +99,7 @@ function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, 
 
       <section className="visual-grid">
         <article id="map" className="panel map-panel"><div className="panel-heading"><div><span className="kicker">GEOGRAPHY</span><h2>Project map</h2></div><div className="legend"><span><i className="transmission"/>Transmission</span><span><i className="distribution"/>Distribution</span></div></div><ProjectMap projects={mapProjects}/></article>
-        <article className="panel"><div className="panel-heading"><div><span className="kicker">PIPELINE</span><h2>Capacity by status</h2></div><span className="unit">MW</span></div><div className="chart tall"><ResponsiveContainer initialDimension={{width:600,height:330}}><BarChart data={summary.statuses.slice(0,7)} layout="vertical" margin={{left:18,right:35}}><CartesianGrid horizontal={false} strokeDasharray="3 3"/><XAxis type="number" tickLine={false} axisLine={false}/><YAxis dataKey="name" type="category" width={105} tickLine={false} axisLine={false} tick={{fontSize:11}}/><Tooltip formatter={(v)=>formatCapacity(Number(v))}/><Bar dataKey="capacity" radius={[0,6,6,0]}>{summary.statuses.slice(0,7).map((_,i)=><Cell key={i} fill={i%2?colors.navy:colors.transmission}/>)}</Bar></BarChart></ResponsiveContainer></div></article>
+        <article className="panel"><div className="panel-heading"><div><span className="kicker">PIPELINE</span><h2>Capacity by status</h2></div><span className="unit">MW</span></div><div className="chart tall"><ResponsiveContainer initialDimension={{width:600,height:330}}><BarChart data={summary.statuses.slice(0,7)} layout="vertical" margin={{left:18,right:35}}><CartesianGrid horizontal={false} strokeDasharray="3 3"/><XAxis type="number" tickLine={false} axisLine={false}/><YAxis dataKey="name" type="category" width={105} tickLine={false} axisLine={false} tick={<StatusAxisTick/>}/><Tooltip formatter={(v)=>formatCapacity(Number(v))}/><Bar dataKey="capacity" radius={[0,6,6,0]}>{summary.statuses.slice(0,7).map((_,i)=><Cell key={i} fill={i%2?colors.navy:colors.transmission}/>)}</Bar></BarChart></ResponsiveContainer></div></article>
       </section>
 
       <section className="chart-grid">
