@@ -1,12 +1,13 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Database, FilterX, Map, RefreshCw, Search, Server, TriangleAlert, Zap } from 'lucide-react';
+import { Activity, BatteryCharging, ChevronLeft, ChevronRight, Coffee, Database, FilterX, Map, RefreshCw, Search, Server, TriangleAlert, Zap } from 'lucide-react';
 import { loadMapProjects, loadProjects, loadSummary, recordVisit, PROJECTS_PER_PAGE, type Filters, type Pagination } from './api';
 import type { MapProject, Project, Summary } from './types';
 
 const colors = { transmission:'#0f9f98', distribution:'#f59e0b', navy:'#0c2d48', muted:'#64748b' };
 const initialFilters: Filters = { source:'all', q:'', status:'', operator:'', year:'' };
+const KOFI_URL='https://ko-fi.com/0xkai';
 
 function formatCapacity(value: number) {
   return value >= 1000 ? `${(value/1000).toFixed(1)} GW` : `${Math.round(value).toLocaleString()} MW`;
@@ -48,6 +49,24 @@ function Sidebar() {
     <nav aria-label="Primary"><a className="active" href="#overview" title="Overview"><Activity/>Overview</a><a href="#map" title="Project map"><Map/>Project map</a><a href="#projects" title="Projects"><Database/>Projects</a></nav>
     <div className="source-note" title="Source: NESO TEC / DNO ECR"><Server/><div><strong>Source</strong><span>NESO TEC / DNO ECR</span></div></div>
   </aside>;
+}
+
+function KofiSupportButton() {
+  const openKofi=(event:MouseEvent<HTMLAnchorElement>)=>{
+    if(window.matchMedia('(max-width:720px)').matches)return;
+
+    event.preventDefault();
+    const width=Math.min(520,window.screen.availWidth-32);
+    const height=Math.min(720,window.screen.availHeight-32);
+    const left=Math.max(0,window.screenX+(window.outerWidth-width)/2);
+    const top=Math.max(0,window.screenY+(window.outerHeight-height)/2);
+    const popup=window.open(KOFI_URL,'kofi-support',`popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)},scrollbars=yes,resizable=yes`);
+
+    if(popup){popup.opener=null;popup.focus()}
+    else window.location.assign(KOFI_URL);
+  };
+
+  return <a className="kofi-support" href={KOFI_URL} target="_blank" rel="noopener noreferrer" onClick={openKofi} aria-label="Support us on Ko-fi"><Coffee aria-hidden="true"/><span>Support Me</span></a>;
 }
 
 function MapResizeOnSidebarChange() {
@@ -115,6 +134,7 @@ function Dashboard({ projects, mapProjects, pagination, page, setPage, summary, 
       </section>
       <footer><span>Created by the GB124 Team and developed by ChatGPT.</span><span>Total visits: {totalVisits?.toLocaleString() ?? '—'}</span></footer>
     </main>
+    <KofiSupportButton/>
   </div>;
 }
 
